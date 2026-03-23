@@ -4,76 +4,74 @@
 
 This server provides tools to interact with the OCI Access Governance (AG) service.
 
----
+It uses OAuth 2.0 for authentication and authorization via an OCI IAM Domain:
 
-## Running the server
+- The MCP server integrates with an OCI IAM OIDC application
+- Users authenticate through the OAuth authorization flow
+- An ID token is issued and attached to requests
+- Tool access is controlled based on roles present in the token (e.g., AG_User, AG_Administrator)
 
-### STDIO transport mode
-
-```bash
-MCP_TRANSPORT=stdio uvx oracle.oci-ag-mcp-server
-```
-
-### HTTP streaming transport mode
-
-```bash
-MCP_TRANSPORT=http ORACLE_MCP_HOST=<hostname> ORACLE_MCP_PORT=<port> uvx oracle.oci-ag-mcp-server
-```
+All tool executions are protected by authentication and role-based authorization.
 
 ---
 
-## Environment Variables
+## Setup
 
-The server supports the following environment variables:
+### 1. Create environment configuration
 
-### Access Governance API Authentication
+Copy the example file:
 
-* OCI_CLIENT_ID
-* OCI_CLIENT_SECRET
-* OCI_TOKEN_URL
-* AG_SCOPE
-* GRANT_TYPE
+cp .env.example .env
 
-### MCP / Authentication
+Update .env with your values:
 
-* OCI_MCP_CLIENT_ID
-* OCI_MCP_CLIENT_SECRET
-* OCI_CONFIG_URL
-* MCP_SERVER_BASE_URL
+OCI_CONFIG_URL=
 
-### Service Endpoints
+OCI_MCP_CLIENT_ID=
 
-* AG_BASE_URL
+OCI_MCP_CLIENT_SECRET=
+
+OCI_AG_CLIENT_ID=
+
+OCI_AG_CLIENT_SECRET=
+
+OCI_TOKEN_URL=
+
+AG_BASE_URL=
+
+AG_SCOPE=
+
+---
+
+## OAuth Configuration
+
+Your OCI IAM application must include the following redirect URI:
+
+http://localhost:8000/mcp/auth/callback
+
+Authentication will fail if this does not match exactly.
+
+---
+
+## Running the Server
+
+uvx oracle.oci-ag-mcp-server
+
+Runs on: http://localhost:8000
 
 ---
 
 ## Tools
 
-| Tool Name                  | Description                       |
-| -------------------------- |-----------------------------------|
-| list_identities            | Lists identities                  |
-| list_identity_collections  | Lists identity collections        |
-| create_identity_collection | Creates a new identity collection |
-| list_access_bundles        | Lists access bundles              |
-| list_orchestrated_systems  | Lists orchestrated systems        |
-| list_access_requests       | Lists access requests             |
-| create_access_request      | Creates a new access request      |
-
----
-
-⚠️ NOTE: All actions are performed using configured OCI credentials. Use least-privilege IAM policies and secure credential handling.
-
----
-
-## Third-Party APIs
-
-Developers distributing this project are responsible for complying with licenses of any third-party dependencies.
-
----
-
-## Disclaimer
-
-Users are responsible for credential security and environment configuration.
+| Tool Name                  | Description                                                      |
+|--------------------------|------------------------------------------------------------------|
+| list_identities           | Retrieve all identities (users)                                  |
+| list_identity_collections | Retrieve all identity collections (groups of users)              |
+| create_identity_collection| Create a new identity collection                                 |
+| list_access_bundles       | Retrieve all access bundles                                      |
+| list_orchestrated_systems | Retrieve all orchestrated systems                                |
+| list_access_requests      | Retrieve all access requests                                     |
+| create_access_request     | Create a new access request for users and access bundles         |
 
 ---
 

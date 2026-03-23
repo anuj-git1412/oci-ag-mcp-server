@@ -4,51 +4,41 @@ Licensed under the Universal Permissive License v1.0 as shown at
 https://oss.oracle.com/licenses/upl.
 """
 
-import sys
-import logging
-import os
-
-# ---------------- LOGGING ----------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stderr)]
-)
-
-logger = logging.getLogger(__name__)
-
-# ---------------- ENV ----------------
 from dotenv import load_dotenv
-load_dotenv()
-
-# ---------------- IMPORTS ----------------
+import os
 from fastmcp import FastMCP
 from pydantic import Field
-from .auth import get_auth_provider, get_auth_middleware, require_roles_from_tags
-from .agclient import AGClient
+
+from .auth import get_auth_provider
+from .ag_client import AccessGovernanceClient
 from .models import (
     map_identity,
     map_identity_collection,
     map_access_bundle,
     map_orchestrated_system,
-    map_access_request
+    map_access_request,
 )
 
-# ---------------- MCP INIT ----------------
+# ---------- ENV ----------
+
+load_dotenv()
+
+# ---------- MCP INIT ----------
 
 mcp = FastMCP(
     name="oci-ag-mcp-server",
-    auth=get_auth_provider(),
-    middleware=[get_auth_middleware()]
+    auth=get_auth_provider()
+   # middleware=[get_auth_middleware()],
 )
 
-client = AGClient()
+client = AccessGovernanceClient()
 
-# ---------------- TOOLS ----------------
+# ---------- TOOLS ----------
+
 
 @mcp.tool(
     name="health_check",
-    description="Health check for MCP server"
+    description="Check if the MCP server is running and reachable. Returns basic health status."
 )
 async def health_check() -> dict:
     return {"status": "Healthy"}
@@ -56,7 +46,7 @@ async def health_check() -> dict:
 
 @mcp.tool(
     name="list_identities",
-    description="List identities in Access Governance"
+    description="Retrieve all identities (users) available in Access Governance. Returns id and name for each identity."
 )
 async def list_identities() -> list[dict]:
     data = await client.list_identities()
@@ -65,7 +55,7 @@ async def list_identities() -> list[dict]:
 
 @mcp.tool(
     name="list_identity_collections",
-    description="List identity collections"
+    description="Retrieve all identity collections (groups of users) in Access Governance."
 )
 async def list_identity_collections() -> list[dict]:
     data = await client.list_identity_collections()
@@ -74,27 +64,28 @@ async def list_identity_collections() -> list[dict]:
 
 @mcp.tool(
     name="create_identity_collection",
-    description="Create a new identity collection",
-    tags={"AG_Administrator"},
-    auth=require_roles_from_tags
+    description=(
+        "Create a new identity collection (group of users). "
+        "Requires a display name and owner. Optionally include initial users."
+    )
 )
 async def create_identity_collection(
-    display_name: str = Field(...),
-    owner: str = Field(...),
-    included_identities: list[str] = Field(default_factory=list)
-) -> dict:
+        display_name: str,
+        owner: str,
+        included_identities: list[str] | None = None,
+     ) -> dict:
 
-    logger.info(f"Creating identity collection: {display_name}")
-
+    included_identities = included_identities or []
     owner_identity = await _resolve_identity(owner)
 
-    included = []
-    for x in included_identities:
-        resolved = await _resolve_identity(x)
-        included.append({
+    included = [
+        {
             "id": resolved["id"],
-            "name": resolved["name"]
-        })
+            "name": resolved["name"],
+        }
+        for x in included_identities
+        for resolved in [await _resolve_identity(x)]
+    ]
 
     payload = {
         "name": _generate_name(display_name),
@@ -106,11 +97,11 @@ async def create_identity_collection(
             {
                 "id": owner_identity["id"],
                 "name": owner_identity["name"],
-                "isPrimary": True
+                "isPrimary": True,
             }
         ],
         "tags": _generate_tags(display_name),
-        "isManagedAtOrchestratedSystem": False
+        "isManagedAtOrchestratedSystem": False,
     }
 
     return await client.create_identity_collection(payload)
@@ -118,7 +109,7 @@ async def create_identity_collection(
 
 @mcp.tool(
     name="list_access_bundles",
-    description="List access bundles in Access Governance"
+    description="Retrieve all access bundles available in Access Governance."
 )
 async def list_access_bundles() -> list[dict]:
     data = await client.list_access_bundles()
@@ -127,7 +118,7 @@ async def list_access_bundles() -> list[dict]:
 
 @mcp.tool(
     name="list_orchestrated_systems",
-    description="List orchestrated systems"
+    description="Retrieve all orchestrated systems configured in Access Governance."
 )
 async def list_orchestrated_systems() -> list[dict]:
     data = await client.list_orchestrated_systems()
@@ -136,7 +127,7 @@ async def list_orchestrated_systems() -> list[dict]:
 
 @mcp.tool(
     name="list_access_requests",
-    description="List access requests"
+    description="Retrieve all access requests in Access Governance."
 )
 async def list_access_requests() -> list[dict]:
     data = await client.list_access_requests()
@@ -145,42 +136,39 @@ async def list_access_requests() -> list[dict]:
 
 @mcp.tool(
     name="create_access_request",
-    description="Create a new access request",
-    tags={"AG_User", "AG_Administrator"},
-    auth=require_roles_from_tags
+    description=(
+        "Create a new access request for one or more users. "
+        "Requires justification, requester, beneficiaries, and access bundles."
+    )
 )
 async def create_access_request(
-    justification: str = Field(...),
-    beneficiaries: list[str] = Field(...),
-    access_bundles: list[str] = Field(...),
-    created_by_user: str = Field(..., description="Requester name")
+    justification: str = Field(..., description="Reason for requesting access"),
+    beneficiaries: list[str] = Field(
+        ..., description="List of users (name or ID) who will receive access"
+    ),
+    access_bundles: list[str] = Field(
+        ..., description="List of access bundles (name or ID) to assign"
+    ),
+    created_by_user: str = Field(
+        ..., description="Requester (user name or ID)"
+    ),
 ) -> dict:
-
     created_by = await _resolve_identity(created_by_user)
 
-    identities = []
-    for b in beneficiaries:
-        resolved = await _resolve_identity(b)
-        identities.append(resolved["id"])
-
-    bundles = []
-    for b in access_bundles:
-        resolved = await _resolve_access_bundle(b)
-        bundles.append(resolved["id"])
+    identities = [(await _resolve_identity(b))["id"] for b in beneficiaries]
+    bundles = [(await _resolve_access_bundle(b))["id"] for b in access_bundles]
 
     payload = {
         "justification": justification,
         "createdBy": created_by["id"],
         "accessBundles": bundles,
-        "identities": identities
+        "identities": identities,
     }
-
-    logger.info("Creating access request")
 
     return await client.create_access_request(payload)
 
 
-# ---------------- HELPERS ----------------
+# ---------- HELPERS ----------
 
 IDENTITY_CACHE = None
 ACCESS_BUNDLE_CACHE = None
@@ -196,13 +184,10 @@ async def _get_identities():
 
 async def _resolve_identity(identifier: str) -> dict:
     identities = await _get_identities()
-    identifier_lower = identifier.lower()
+    identifier = identifier.lower()
 
     for i in identities:
-        if (
-            identifier_lower == (i.id or "").lower()
-            or identifier_lower == (i.name or "").lower()
-        ):
+        if identifier in {(i.id or "").lower(), (i.name or "").lower()}:
             return {"id": i.id, "name": i.name}
 
     raise ValueError(f"Identity not found: {identifier}")
@@ -218,13 +203,10 @@ async def _get_access_bundles():
 
 async def _resolve_access_bundle(name: str) -> dict:
     bundles = await _get_access_bundles()
-    name_lower = name.lower()
+    name = name.lower()
 
     for b in bundles:
-        if (
-            name_lower == (b.id or "").lower()
-            or name_lower == (b.name or "").lower()
-        ):
+        if name in {(b.id or "").lower(), (b.name or "").lower()}:
             return {"id": b.id, "name": b.name}
 
     raise ValueError(f"Access bundle not found: {name}")
@@ -239,22 +221,17 @@ def _generate_description(display_name: str) -> str:
 
 
 def _generate_tags(display_name: str) -> list[str]:
-    return [display_name.lower().replace(" ", "_")]
+    return [_generate_name(display_name)]
 
 
-# ---------------- RUN ----------------
+# ---------- RUN ----------
 
 def main():
-    transport = os.getenv("MCP_TRANSPORT", "http")
-
-    if transport == "stdio":
-        mcp.run(transport="stdio")
-    else:
-        mcp.run(
-            transport="http",
-            host=os.getenv("ORACLE_MCP_HOST", "0.0.0.0"),
-            port=int(os.getenv("ORACLE_MCP_PORT", "8000"))
-        )
+    mcp.run(
+        transport="http",
+        host="localhost",
+        port=8000,
+    )
 
 
 if __name__ == "__main__":
