@@ -10,7 +10,7 @@ class DebugOAuth(OAuth):
     async def redirect_handler(self, authorization_url: str):
         return await super().redirect_handler(authorization_url)
 
-oauth = DebugOAuth(scopes=["openid", "get_approles", "approles"])
+oauth = DebugOAuth(scopes=["openid", "profile", "email", "groups", "approles", "get_approles"])
 
 
 # ---------- CONTEXT ----------

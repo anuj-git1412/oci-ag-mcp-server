@@ -5,7 +5,6 @@ https://oss.oracle.com/licenses/upl.
 """
 
 from dotenv import load_dotenv
-import os
 from fastmcp import FastMCP
 from pydantic import Field
 
@@ -28,7 +27,6 @@ load_dotenv()
 mcp = FastMCP(
     name="oci-ag-mcp-server",
     auth=get_auth_provider()
-   # middleware=[get_auth_middleware()],
 )
 
 client = AccessGovernanceClient()
@@ -46,7 +44,7 @@ async def health_check() -> dict:
 
 @mcp.tool(
     name="list_identities",
-    description="Retrieve all identities (users) available in Access Governance. Returns id and name for each identity."
+    description="Retrieve all identities (users) available in Access Governance."
 )
 async def list_identities() -> list[dict]:
     data = await client.list_identities()
@@ -55,7 +53,7 @@ async def list_identities() -> list[dict]:
 
 @mcp.tool(
     name="list_identity_collections",
-    description="Retrieve all identity collections (groups of users) in Access Governance."
+    description="Retrieve all identity collections (groups of users)."
 )
 async def list_identity_collections() -> list[dict]:
     data = await client.list_identity_collections()
@@ -64,16 +62,22 @@ async def list_identity_collections() -> list[dict]:
 
 @mcp.tool(
     name="create_identity_collection",
-    description=(
-        "Create a new identity collection (group of users). "
-        "Requires a display name and owner. Optionally include initial users."
-    )
+    description="Create a new identity collection (group of users)."
 )
 async def create_identity_collection(
-        display_name: str,
-        owner: str,
-        included_identities: list[str] | None = None,
-     ) -> dict:
+    display_name: str = Field(
+        ...,
+        description="Display name of the identity collection"
+    ),
+    owner: str = Field(
+        ...,
+        description="Owner (user name or ID)"
+    ),
+    included_identities: list[str] | None = Field(
+        None,
+        description="Optional list of identities to include"
+    ),
+) -> dict:
 
     included_identities = included_identities or []
     owner_identity = await _resolve_identity(owner)
@@ -109,7 +113,7 @@ async def create_identity_collection(
 
 @mcp.tool(
     name="list_access_bundles",
-    description="Retrieve all access bundles available in Access Governance."
+    description="Retrieve all access bundles."
 )
 async def list_access_bundles() -> list[dict]:
     data = await client.list_access_bundles()
@@ -118,7 +122,7 @@ async def list_access_bundles() -> list[dict]:
 
 @mcp.tool(
     name="list_orchestrated_systems",
-    description="Retrieve all orchestrated systems configured in Access Governance."
+    description="Retrieve all orchestrated systems."
 )
 async def list_orchestrated_systems() -> list[dict]:
     data = await client.list_orchestrated_systems()
@@ -127,7 +131,7 @@ async def list_orchestrated_systems() -> list[dict]:
 
 @mcp.tool(
     name="list_access_requests",
-    description="Retrieve all access requests in Access Governance."
+    description="Retrieve all access requests."
 )
 async def list_access_requests() -> list[dict]:
     data = await client.list_access_requests()
@@ -136,22 +140,13 @@ async def list_access_requests() -> list[dict]:
 
 @mcp.tool(
     name="create_access_request",
-    description=(
-        "Create a new access request for one or more users. "
-        "Requires justification, requester, beneficiaries, and access bundles."
-    )
+    description="Create a new access request."
 )
 async def create_access_request(
     justification: str = Field(..., description="Reason for requesting access"),
-    beneficiaries: list[str] = Field(
-        ..., description="List of users (name or ID) who will receive access"
-    ),
-    access_bundles: list[str] = Field(
-        ..., description="List of access bundles (name or ID) to assign"
-    ),
-    created_by_user: str = Field(
-        ..., description="Requester (user name or ID)"
-    ),
+    beneficiaries: list[str] = Field(..., description="Users receiving access"),
+    access_bundles: list[str] = Field(..., description="Access bundles to assign"),
+    created_by_user: str = Field(..., description="Requester"),
 ) -> dict:
     created_by = await _resolve_identity(created_by_user)
 
