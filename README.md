@@ -57,7 +57,7 @@ AG_SCOPE=
 
 ## Running the Server
 
-### Export environment variables:
+### Set the environment:
 
 ```
 export $(cat .env | xargs)
