@@ -39,10 +39,6 @@ Register a second client app for access to AG APIs.
 
 ### 3. Create environment configuration
 
-```
-cp .env.example .env
-```
-
 Update `.env` with your values:
 
 ```
