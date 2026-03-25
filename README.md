@@ -26,14 +26,16 @@ cd oci-ag-mcp-server
 
 ### 2. Configure OAuth (OCI IAM)
 
-Setting up authentication requires registering a confidential client in OCI IAM domain.
-The application must include the following redirect URI:
+Setting up authentication requires registering a confidential client application in OCI IAM domain.
+Make sure to select "Authorization code" under Allowed grant types.
+The application must also include the following redirect URI:
 
 ```
 http://localhost:8000/mcp/auth/callback
 ```
 
-Register a second client app for access to AG APIs.
+Register a second confidential application to access AG APIs.
+Ensure that the application is assigned the appropriate AG scope.
 
 ---
 
