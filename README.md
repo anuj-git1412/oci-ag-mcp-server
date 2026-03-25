@@ -57,6 +57,14 @@ AG_SCOPE=
 
 ## Running the Server
 
+### Export environment variables:
+
+```
+export $(cat .env | xargs)
+```
+
+### Run the server:
+
 ```
 uvx oracle.oci-ag-mcp-server
 ```
