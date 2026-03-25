@@ -39,7 +39,7 @@ Register a second client app for access to AG APIs.
 
 ### 3. Create environment configuration
 
-Update `.env` with your values:
+Create a `.env` file and populate it with your configuration values:
 
 ```
 # ---------- MCP Authentication (OIDC) ----------
