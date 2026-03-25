@@ -4,14 +4,15 @@
 
 The Oracle Access Governance MCP Server exposes Access Governance (AG) capabilities as MCP tools, enabling secure interaction from MCP-compatible clients (e.g., Claude, custom clients etc.).
 
-It integrates with OCI IAM (Identity Domains) using OAuth 2.0 (OIDC) to authenticate MCP clients. All tool executions require a valid token issued by OCI IAM.
+It integrates with OCI IAM (Identity Domains) using OAuth 2.0 (OIDC) to authenticate MCP clients.
 
 ### Flow
-1. User authenticates via OCI IAM (OIDC)
-2. MCP server receives an access/ID token
-3. Token is validated
-4. Authenticated requests are allowed to invoke MCP tools
-5. Server uses client credentials flow to call OCI AG APIs
+1. A client (user or agent) sends a request to the MCP server
+2. If unauthenticated, the request is redirected via OIDC/OAuth proxy to OCI IAM
+3. The user authenticates with OCI IAM
+4. OCI IAM issues tokens, which are validated by the proxy/MCP layer
+5. MCP server establishes its own session or issues an MCP-specific token
+6. Client uses MCP-issued session/token for subsequent requests
 
 ---
 
@@ -27,7 +28,7 @@ cd oci-ag-mcp-server
 ### 2. Configure OAuth (OCI IAM)
 
 Setting up authentication requires registering a confidential client application in OCI IAM domain.
-Make sure to select "Authorization code" under Allowed grant types.
+Make sure to select "Authorization code" and "Client credentials" under Allowed grant types.
 The application must also include the following redirect URI:
 
 ```
