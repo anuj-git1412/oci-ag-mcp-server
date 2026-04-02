@@ -8,15 +8,10 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 from pydantic import Field
 
-from .auth import get_auth_provider
+from .auth import *
+#from .auth import *
 from .ag_client import AccessGovernanceClient
-from .models import (
-    map_identity,
-    map_identity_collection,
-    map_access_bundle,
-    map_orchestrated_system,
-    map_access_request,
-)
+from .models import *
 
 # ---------- ENV ----------
 
@@ -26,7 +21,9 @@ load_dotenv()
 
 mcp = FastMCP(
     name="oci-ag-mcp-server",
-    auth=get_auth_provider()
+    #auth=get_auth_provider()
+    auth=get_auth_provider_new(),
+    middleware=[get_auth_middleware()]
 )
 
 client = AccessGovernanceClient()
@@ -36,15 +33,18 @@ client = AccessGovernanceClient()
 
 @mcp.tool(
     name="health_check",
-    description="Check if the MCP server is running and reachable. Returns basic health status."
+    description="Check if the MCP server is running and reachable. Returns basic health status.",
+    tags={"AG_User"},
+    auth=require_roles_from_tags
 )
 async def health_check() -> dict:
     return {"status": "Healthy"}
 
-
 @mcp.tool(
     name="list_identities",
-    description="Retrieve all identities (users) available in Access Governance."
+    description="Retrieve all identities (users) available in Access Governance.",
+    tags={"AG_Administrator"},
+    auth=require_roles_from_tags
 )
 async def list_identities() -> list[dict]:
     data = await client.list_identities()
@@ -53,7 +53,9 @@ async def list_identities() -> list[dict]:
 
 @mcp.tool(
     name="list_identity_collections",
-    description="Retrieve all identity collections (groups of users)."
+    description="Retrieve all identity collections (groups of users).",
+    tags={"AG_AccessControl_Admin"},
+    auth=require_roles_from_tags
 )
 async def list_identity_collections() -> list[dict]:
     data = await client.list_identity_collections()
@@ -62,7 +64,10 @@ async def list_identity_collections() -> list[dict]:
 
 @mcp.tool(
     name="create_identity_collection",
-    description="Create a new identity collection (group of users)."
+    description="Create a new identity collection (group of users).",
+   # tags={"AG_Administrator"},
+    tags={"AG_Administrator"},
+    auth=require_roles_from_tags
 )
 async def create_identity_collection(
     display_name: str = Field(
@@ -113,7 +118,9 @@ async def create_identity_collection(
 
 @mcp.tool(
     name="list_access_bundles",
-    description="Retrieve all access bundles."
+    description="Retrieve all access bundles.",
+    tags={"AG_Administrator"},
+    auth=require_roles_from_tags
 )
 async def list_access_bundles() -> list[dict]:
     data = await client.list_access_bundles()
@@ -122,7 +129,9 @@ async def list_access_bundles() -> list[dict]:
 
 @mcp.tool(
     name="list_orchestrated_systems",
-    description="Retrieve all orchestrated systems."
+    description="Retrieve all orchestrated systems.",
+    tags={"AG_Administrator"},
+    auth=require_roles_from_tags
 )
 async def list_orchestrated_systems() -> list[dict]:
     data = await client.list_orchestrated_systems()
@@ -131,7 +140,9 @@ async def list_orchestrated_systems() -> list[dict]:
 
 @mcp.tool(
     name="list_access_requests",
-    description="Retrieve all access requests."
+    description="Retrieve all access requests.",
+    tags={"AG_User"},
+    auth=require_roles_from_tags
 )
 async def list_access_requests() -> list[dict]:
     data = await client.list_access_requests()
@@ -140,7 +151,9 @@ async def list_access_requests() -> list[dict]:
 
 @mcp.tool(
     name="create_access_request",
-    description="Create a new access request."
+    description="Create a new access request.",
+    tags={"AG_User"},
+    auth=require_roles_from_tags
 )
 async def create_access_request(
     justification: str = Field(..., description="Reason for requesting access"),
@@ -227,7 +240,6 @@ def main():
         host="localhost",
         port=8000,
     )
-
 
 if __name__ == "__main__":
     main()
